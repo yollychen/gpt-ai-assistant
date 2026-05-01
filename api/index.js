@@ -1,15 +1,9 @@
 import express from 'express';
-import Assistant from '../assistant/index.js';
-import {
-  validator,
-} from '../middleware/index.js';
-import {
-  APP_URL,
-  APP_PORT,
-  LINE_API_SECRET,
-} from '../config/index.js';
-
-const assistant = new Assistant();
+import { handleEvents, printPrompts } from '../app/index.js';
+import config from '../config/index.js';
+import { validateLineSignature } from '../middleware/index.js';
+import storage from '../storage/index.js';
+import { fetchVersion, getVersion } from '../utils/index.js';
 
 const app = express();
 
@@ -19,28 +13,30 @@ app.use(express.json({
   },
 }));
 
-app.get('/', (req, res) => {
-  if (APP_URL) {
-    res.redirect(APP_URL);
+app.get('/', async (req, res) => {
+  if (config.APP_URL) {
+    res.redirect(config.APP_URL);
     return;
   }
-  res.sendStatus(200);
+  const currentVersion = getVersion();
+  const latestVersion = await fetchVersion();
+  res.status(200).send({ status: 'OK', currentVersion, latestVersion });
 });
 
-app.post('/webhook', validator(LINE_API_SECRET), async (req, res) => {
+app.post(config.APP_WEBHOOK_PATH, validateLineSignature, async (req, res) => {
   try {
-    await assistant.handleEvents(req.body.events);
+    await storage.initialize();
+    await handleEvents(req.body.events);
+    res.sendStatus(200);
   } catch (err) {
-    console.error(err);
+    console.error(err.message);
     res.sendStatus(500);
-    return;
   }
-  assistant.debug();
-  res.sendStatus(200);
+  if (config.APP_DEBUG) printPrompts();
 });
 
-if (APP_PORT) {
-  app.listen(APP_PORT);
+if (config.APP_PORT) {
+  app.listen(config.APP_PORT);
 }
 
 export default app;
