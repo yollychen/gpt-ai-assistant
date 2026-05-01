@@ -146,17 +146,37 @@ async function searchFlightsMock(params: FlightSearchParams): Promise<FlightSear
 
 async function searchFlightsWithGemini(params: FlightSearchParams): Promise<FlightSearchResult> {
   const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`
 
   const prompt = `
-    你是一個航班查詢助理。請根據以下條件查詢航班資訊並以 JSON 格式回傳：
-    - 出發地: ${params.origin}
-    - 目的地: ${params.destination}
-    - 日期: ${params.date}
+你是一個航班查詢助理。請根據以下條件模擬產生 5 筆航班資訊，並「只」回傳一個 JSON 陣列，不要加任何說明文字或 markdown 格式。
 
-    請回傳格式如下的 JSON 陣列：
-    [{ "airline": "...", "flightNumber": "...", "departureTime": "...", "arrivalTime": "...", "price": 0 }]
-  `
+搜尋條件：
+- 出發地: ${params.origin}
+- 目的地: ${params.destination}
+- 日期: ${params.date}
+
+每筆資料必須符合以下格式（所有欄位都必須填寫）：
+[
+  {
+    "id": "唯一代碼，例如 CI101",
+    "airline": "航空公司中文名稱",
+    "airlineCode": "兩字母IATA代碼，例如 CI",
+    "flightNumber": "完整班號，例如 CI 101",
+    "origin": "${params.origin}",
+    "originCode": "出發機場IATA代碼",
+    "destination": "${params.destination}",
+    "destinationCode": "目的地機場IATA代碼",
+    "departureTime": "HH:MM 格式",
+    "arrivalTime": "HH:MM 格式",
+    "duration": "例如 3h 30m",
+    "price": 數字（台幣，不含單位）,
+    "currency": "TWD",
+    "seatsAvailable": 數字,
+    "cabinClass": "economy 或 business 或 first"
+  }
+]
+`
 
   const response = await fetch(endpoint, {
     method: 'POST',
@@ -169,8 +189,11 @@ async function searchFlightsWithGemini(params: FlightSearchParams): Promise<Flig
   if (!response.ok) throw new Error(`Gemini API error: ${response.status}`)
 
   const data = await response.json()
-  const text: string = data.candidates[0].content.parts[0].text
-  const flights: Flight[] = JSON.parse(text)
+  const rawText: string = data.candidates[0].content.parts[0].text
+
+  // Strip markdown code fences if Gemini wraps the response
+  const jsonText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+  const flights: Flight[] = JSON.parse(jsonText)
 
   return { flights, searchParams: params, totalCount: flights.length }
 }
