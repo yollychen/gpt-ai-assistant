@@ -1,4 +1,11 @@
+import { GoogleGenAI } from '@google/genai'
 import type { Flight, FlightSearchParams, FlightSearchResult } from '../types/flight'
+
+// ---------------------------------------------------------------------------
+// Gemini client（使用 @google/genai SDK）
+// ---------------------------------------------------------------------------
+
+const genAI = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY as string })
 
 // ---------------------------------------------------------------------------
 // Mock Data
@@ -141,22 +148,14 @@ async function searchFlightsMock(params: FlightSearchParams): Promise<FlightSear
 }
 
 // ---------------------------------------------------------------------------
-// Gemini API integration (placeholder — implement when API key is available)
+// Gemini API + Google Search grounding
 // ---------------------------------------------------------------------------
 
 async function searchFlightsWithGemini(params: FlightSearchParams): Promise<FlightSearchResult> {
-  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`
-
   const prompt = `
-你是一個航班查詢助理。請根據以下條件模擬產生 5 筆航班資訊，並「只」回傳一個 JSON 陣列，不要加任何說明文字或 markdown 格式。
+請使用 Google 搜尋查詢 ${params.date} 從 ${params.origin} 到 ${params.destination} 的即時航班票價。
 
-搜尋條件：
-- 出發地: ${params.origin}
-- 目的地: ${params.destination}
-- 日期: ${params.date}
-
-每筆資料必須符合以下格式（所有欄位都必須填寫）：
+搜尋後請「只」回傳一個 JSON 陣列，不要加任何說明文字或 markdown 格式，每筆格式如下：
 [
   {
     "id": "唯一代碼，例如 CI101",
@@ -178,21 +177,18 @@ async function searchFlightsWithGemini(params: FlightSearchParams): Promise<Flig
 ]
 `
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-    }),
+  const result = await genAI.models.generateContent({
+    model: 'gemini-2.0-flash',
+    contents: prompt,
+    config: {
+      tools: [{ googleSearch: {} }],
+    },
   })
 
-  if (!response.ok) throw new Error(`Gemini API error: ${response.status}`)
+  const rawText = result.text ?? ''
 
-  const data = await response.json()
-  const rawText: string = data.candidates[0].content.parts[0].text
-
-  // Strip markdown code fences if Gemini wraps the response
-  const jsonText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+  // Strip markdown code fences if present
+  const jsonText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/m, '').trim()
   const flights: Flight[] = JSON.parse(jsonText)
 
   return { flights, searchParams: params, totalCount: flights.length }
