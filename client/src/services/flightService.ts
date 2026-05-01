@@ -144,41 +144,42 @@ async function searchFlightsMock(params: FlightSearchParams): Promise<FlightSear
 // Gemini API integration (placeholder — implement when API key is available)
 // ---------------------------------------------------------------------------
 
-// async function searchFlightsWithGemini(params: FlightSearchParams): Promise<FlightSearchResult> {
-//   const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY
-//   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`
-//
-//   const prompt = `
-//     你是一個航班查詢助理。請根據以下條件查詢航班資訊並以 JSON 格式回傳：
-//     - 出發地: ${params.origin}
-//     - 目的地: ${params.destination}
-//     - 日期: ${params.date}
-//
-//     請回傳格式如下的 JSON 陣列：
-//     [{ "airline": "...", "flightNumber": "...", "departureTime": "...", "arrivalTime": "...", "price": 0 }]
-//   `
-//
-//   const response = await fetch(endpoint, {
-//     method: 'POST',
-//     headers: { 'Content-Type': 'application/json' },
-//     body: JSON.stringify({
-//       contents: [{ parts: [{ text: prompt }] }],
-//     }),
-//   })
-//
-//   if (!response.ok) throw new Error(`Gemini API error: ${response.status}`)
-//
-//   const data = await response.json()
-//   const text: string = data.candidates[0].content.parts[0].text
-//   const flights: Flight[] = JSON.parse(text)
-//
-//   return { flights, searchParams: params, totalCount: flights.length }
-// }
+async function searchFlightsWithGemini(params: FlightSearchParams): Promise<FlightSearchResult> {
+  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`
+
+  const prompt = `
+    你是一個航班查詢助理。請根據以下條件查詢航班資訊並以 JSON 格式回傳：
+    - 出發地: ${params.origin}
+    - 目的地: ${params.destination}
+    - 日期: ${params.date}
+
+    請回傳格式如下的 JSON 陣列：
+    [{ "airline": "...", "flightNumber": "...", "departureTime": "...", "arrivalTime": "...", "price": 0 }]
+  `
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+    }),
+  })
+
+  if (!response.ok) throw new Error(`Gemini API error: ${response.status}`)
+
+  const data = await response.json()
+  const text: string = data.candidates[0].content.parts[0].text
+  const flights: Flight[] = JSON.parse(text)
+
+  return { flights, searchParams: params, totalCount: flights.length }
+}
 
 // ---------------------------------------------------------------------------
 // Public API — swap searchFlightsMock with searchFlightsWithGemini when ready
 // ---------------------------------------------------------------------------
 
 export async function searchFlights(params: FlightSearchParams): Promise<FlightSearchResult> {
-  return searchFlightsMock(params)
+  // return searchFlightsMock(params)
+  return searchFlightsWithGemini(params)
 }
