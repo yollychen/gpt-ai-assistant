@@ -1,5 +1,16 @@
 {
   "github": {
     "enabled": false
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api"
+    }
+  ],
+  "functions": {
+    "api/**/*": {
+      "maxDuration": 10
+    }
   }
 }

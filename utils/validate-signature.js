@@ -14,10 +14,10 @@ const safeCompare = (a, b) => {
 
 const validateSignature = (
   body,
-  channelSecret,
+  secret,
   signature,
 ) => safeCompare(
-  createHmac('SHA256', channelSecret).update(body).digest(),
+  createHmac('SHA256', secret).update(body).digest(),
   s2b(signature, 'base64'),
 );
 
